@@ -1,0 +1,92 @@
+58同城租房信息爬虫程序
+此程序使用scrapy框架搭建爬虫结构，并引入scrapy-redis模块以提供分布式爬取。
+
+# ==============================QuickStart=================================================
+
+数据库配置
+scrapy-redis模块要求我们提供redis数据库作为数据存储和调用，需要配置redis数据库以允许远程访问：
+    在redis安装目录中的redis.windows.conf/redis.conf文件中配置：
+        # 允许远程接入redis
+        bind 0.0.0.0
+        # 关闭保护模式以接受远程请求
+        protected mode no
+
+    在redis服务器上通过shell启动redis数据库：
+        # windows系统
+        redis-server.exe redis.windows.conf
+        # linux系统
+        src/redis-server redis.conf
+
+        # 新建一个shell访问redis数据库以测试数据库连接正确并发布下载任务
+        lpush city58_zufang_list https://hz.58.com/chuzu/pn1
+
+
+爬虫程序配置
+scrapy-redis模块要求我们在爬虫程序中提供访问redis数据库的基本信息：
+    在city58_spy.settings文件中配置：
+        # 分布式爬虫的调度器配置
+        # 去重队列
+        DUPEFILTER_CLASS = 'scrapy_redis.dupefilter.RFPDupeFilter'
+        # 使用共享调度器
+        SCHEDULER = 'scrapy_redis.scheduler.Scheduler'
+        # 是否允许暂停,即断点续爬
+        SCHEDULER_PERSIST = True
+
+        # 分布式爬虫环境下，需要指定远程服务器的地址
+        REDIS_HOST = 'x.x.x.x'
+        REDIS_PORT = 6379
+
+
+程序使用和启动
+在完成分布式的相关配置后，复制city58_spy程序到其他电脑终端，然后配置启动命令：
+    在电脑终端通过shell启动爬虫程序：
+        进入city58_py/city58_py/spiders目录并执行命令：
+            # 查看当前可用爬虫对象，你应该可以看到city58的返回
+            scrapy list
+            # 启动分布式爬虫
+            scrapy runspider city58.py
+此时爬虫程序将会启动，并开始下载任务。
+
+
+# ==============================其他说明=================================================
+
+
+代理配置
+为了减少爬虫被服务器识别并封禁的概率，本程序默认启用了一个下载中间件MyRedisProxyDownLoaderMiddleware用于
+提供请求的代理地址。此中间件将会调用city58_spy.libs.proxy.RedisPool类，RedisPool类帮助爬虫程序获取redis
+数据库中的代理地址：
+    如果要停用代理服务，或者自定义其他的代理服务，只需要注释如下语句即可：
+        将city58_spy.settings.DOWNLOADER_MIDDLEWARES中对应的：
+            city58_spy.middlewares.MyRedisProxyDownLoaderMiddleware: xxx
+        此行注释即可
+
+    此代理模块涉及redis服务器的链接，所以需要配置redis服务器的相关配置：
+    在city58_spy.settings中配置：
+        PROXY_REDIS_HOST = 'x.x.x.x'
+        PROXY_REDIS_PORT = 6379
+        # redis服务器中保存数据的索引，在redis中是一个无序集合
+        PROXY_REDIS_KEY = 'proxy_address_list'
+
+    此代理配置将会链接指定redis服务器并尝试获取一个代理地址，地址数据格式:
+        address = {
+            'protocol': 'http',
+            'ip': 'x.x.x.x',
+            'port': 'xxx',
+        }
+    如果未从redis中获取到一个可用的代理地址，则不会对原始的请求对象执行代理信息的修改。
+    要正确的获取到可用的代理地址，需要你完成redis服务器中指定索引的地址增加。
+
+
+处理服务拒绝
+本程序完成了对58同城租房页面的服务拒绝处理。服务拒绝目前发现2种判断条件：
+1、服务器返回的响应码是403
+2、服务器返回的响应对象中url形如： https://callback.58.com/firewall/verifycode?...
+爬虫程序默认启用了一个爬虫中间件MyCatchHttpForbiddenSpiderMiddleware处理服务拒绝：
+    如果要停用处理拒绝服务，或者自定义其他的实现方式，只需要注释如下语句即可：
+        将city58_spy.settings.SPIDER_MIDDLEWARES中对应的：
+            city58_spy.middlewares.MyCatchHttpForbiddenSpiderMiddleware: xxx
+        此行注释即可
+
+    否则，此中间件默认会处理上述两种拒绝服务条件的发生，汇总拒绝的相关信息，
+    并将拒绝的请求url存放到如下路径中：
+        city58_spy.settings.FORBIDDEN_FILE_PATH

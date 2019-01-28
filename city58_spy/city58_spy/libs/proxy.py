@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 # 'author':'zlw'
 
+
 """
 代理地址池模块
 代理地址对象的结构定义:
     address = {
-    'protocol': 'http',
+    'protocol': 'http/https',
     'ip': '1.1.1.1',
     'port': 8080,
     }
@@ -16,13 +17,14 @@ import redis
 import random
 import json
 import logging
+
 from abc import ABCMeta, abstractmethod
 
 
 logger = logging.getLogger(__name__)
 
 
-class Pool(object, metaclass=ABCMeta):
+class AbstractPool(object, metaclass=ABCMeta):
     @abstractmethod
     def get_random_http_address(self):
         pass
@@ -36,7 +38,7 @@ class Pool(object, metaclass=ABCMeta):
         pass
 
 
-class RedisPool(Pool):
+class RedisPool(AbstractPool):
     def __init__(self, redis_key, redis_host, redis_port, **kw):
         # redis数据库索引名称
         self.redis_key = redis_key

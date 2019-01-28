@@ -5,8 +5,8 @@ import logging
 import scrapy
 from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders import CrawlSpider, Rule
-
 from bs4 import BeautifulSoup
+
 from city58_spy.items import City58SpyItem
 from scrapy_redis.spiders import RedisCrawlSpider
 
